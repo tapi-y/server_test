@@ -1,4 +1,82 @@
 # coding:utf-8
+import threading
+import time
+import re
+import urllib2
+import json
+# websocketサーバ
+import tornado.web
+import tornado.httpserver
+import tornado.websocket
+from tornado.concurrent import is_future
+import threading
+from tornado import gen
+import traceback
+from tornado.web import url
+
+###################################################################
+# WebSocketのコマンド受付
+###################################################################
+def _handler(data):
+    global state
+
+    print "requested:", data
+    dic = json.loads(data)
+    if dic["api"] == "washing_exec":
+        if dic["status"] == "exec":
+            if state == "disconnect" or state == "debug_connecting":
+                #print dic["param"]
+                #exec_custom(2)
+                t = threading.Thread(target=exec_washing)
+                t.start()
+        if dic["status"] == "off":
+            if state != "disconnect" and state != "debug_connecting":
+                power_btn()
+
+        return 0
+    return -1
+
+
+###################################################################
+# キー入力受付
+###################################################################
+def get_key():
+    global server
+    
+    try:
+        c = sys.stdin.read(1)
+        if c == '0':
+            exec_custom(0)
+        if c == '1':
+            exec_custom(1)
+        if c == '2':
+            #exec_custom(2)
+            exec_washing()
+        elif c == '3':
+            server.emit_event("door_opened", "")
+        elif c == 'p':
+            power_btn()
+
+        t = threading.Timer(0.5, get_key)
+        t.start()
+    except KeyboardInterrupt:
+        sys.exit()
+    
+    #return c
+
+def _arg_parser():
+    from argparse import ArgumentParser
+
+    usage = ' python {} [--bind_host ADDR] [--bind_port port] [--help]' \
+        .format(__file__)
+    argparser = ArgumentParser(usage=usage)
+    argparser.add_argument('--bind_host', type=str,
+                           default="0.0.0.0",
+                           help='bind address')
+    argparser.add_argument('--bind_port', type=int,
+                           default="8080",
+                           help='bind port')
+    return argparser.parse_args()
 
 ###################################################################
 # 
@@ -11,20 +89,6 @@ def main():
     global lastrcv_time
     global exec_start_time
     global server
-
-    #Setting
-    #config = ConfigParser.ConfigParser()
-    #config.read(CONFIG_FILE)
-    #url = config.get('PCPF', 'url')
-    #deviceGuid = config.get('PCPF', 'DeviceGuid')
-    #cycle = config.get('PCPF', 'Cycle')
-   
-    #pdp = PDP.PdpUtil(url, deviceGuid, cb_cmd)
-    #t1 = threading.Thread(target=pdp.ws_start)
-    #t1.start()
-
-
-
 
     
     ###################################################################
